@@ -1,0 +1,27 @@
+
+============================================================
+IQN (Independent Q-Network) for Wireless Communication Environment
+============================================================
+Mode: train
+Grid: 5 x 5
+Agents: 25
+Device: cuda
+Seed: 6000
+============================================================
+
+============================================================
+TRAINING MODE
+============================================================
+============================================================
+Starting IQN Training for Wireless Communication
+============================================================
+Config(
+  Algorithm: IQN (Independent Q-Network)
+  Environment: 5x5 grid, 25 agents
+  Neighborhoods: κ_o=1, κ_r=1
+  Training: 50 episodes, batch_size=256
+  Learning rates: actor=0.0001, critic=0.0003
+  Device: cuda
+)
+============================================================
+Training:   0%|          | 0/50 [00:00<?, ?episode/s]Training:   0%|          | 0/50 [00:01<?, ?episode/s]Training:   2%|▏         | 1/50 [00:01<00:51,  1.05s/episode]Training:   2%|▏         | 1/50 [00:02<00:51,  1.05s/episode]Training:   4%|▍         | 2/50 [00:02<00:49,  1.03s/episode]Training:   4%|▍         | 2/50 [00:03<00:49,  1.03s/episode]Training:   6%|▌         | 3/50 [00:03<00:47,  1.01s/episode]Training:   6%|▌         | 3/50 [00:04<00:47,  1.01s/episode]Training:   8%|▊         | 4/50 [00:04<00:45,  1.00episode/s]Training:   8%|▊         | 4/50 [00:05<00:45,  1.00episode/s]Training:  10%|█         | 5/50 [00:05<00:44,  1.00episode/s]Training:  10%|█         | 5/50 [00:06<00:44,  1.00episode/s]Training:  12%|█▏        | 6/50 [00:06<00:43,  1.00episode/s]Training:  12%|█▏        | 6/50 [00:06<00:43,  1.00episode/s]Training:  14%|█▍        | 7/50 [00:06<00:42,  1.01episode/s]Training:  14%|█▍        | 7/50 [00:07<00:42,  1.01episode/s]Training:  16%|█▌        | 8/50 [00:07<00:40,  1.03episode/s]Training:  16%|█▌        | 8/50 [00:08<00:40,  1.03episode/s]Training:  18%|█▊        | 9/50 [00:08<00:39,  1.05episode/s]Training:  18%|█▊        | 9/50 [00:09<00:39,  1.05episode/s]Training:  20%|██        | 10/50 [00:09<00:38,  1.04episode/s]Training:  20%|██        | 10/50 [00:10<00:38,  1.04episode/s]Training:  22%|██▏       | 11/50 [00:10<00:37,  1.03episode/s]Training:  22%|██▏       | 11/50 [00:11<00:37,  1.03episode/s]Training:  24%|██▍       | 12/50 [00:11<00:36,  1.03episode/s]Training:  24%|██▍       | 12/50 [00:12<00:36,  1.03episode/s]Training:  26%|██▌       | 13/50 [00:12<00:35,  1.03episode/s]Training:  26%|██▌       | 13/50 [00:13<00:35,  1.03episode/s]Training:  28%|██▊       | 14/50 [00:13<00:35,  1.03episode/s]Training:  28%|██▊       | 14/50 [00:14<00:35,  1.03episode/s]Training:  30%|███       | 15/50 [00:14<00:34,  1.03episode/s]Training:  30%|███       | 15/50 [00:15<00:34,  1.03episode/s]Training:  32%|███▏      | 16/50 [00:15<00:33,  1.02episode/s]Training:  32%|███▏      | 16/50 [00:16<00:33,  1.02episode/s]Training:  34%|███▍      | 17/50 [00:16<00:32,  1.02episode/s]Training:  34%|███▍      | 17/50 [00:17<00:32,  1.02episode/s]Training:  36%|███▌      | 18/50 [00:17<00:31,  1.02episode/s]Training:  36%|███▌      | 18/50 [00:18<00:31,  1.02episode/s]Training:  38%|███▊      | 19/50 [00:18<00:30,  1.03episode/s]Training:  38%|███▊      | 19/50 [00:19<00:30,  1.03episode/s]Training:  40%|████      | 20/50 [00:19<00:28,  1.04episode/s]Training:  40%|████      | 20/50 [00:28<00:28,  1.04episode/s]Training:  42%|████▏     | 21/50 [00:28<01:41,  3.50s/episode]
