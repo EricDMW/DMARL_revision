@@ -1,0 +1,25 @@
+
+============================================================
+DMARL for Wireless Communication Environment
+============================================================
+Mode: train
+Grid: 5 x 5
+Agents: 25
+Device: cuda
+============================================================
+
+============================================================
+TRAINING MODE
+============================================================
+============================================================
+Starting DMARL Training for Wireless Communication
+============================================================
+Config(
+  Environment: 5x5 grid, 25 agents
+  Neighborhoods: κ_o=1, κ_r=1
+  Training: 5000 episodes, batch_size=256
+  Learning rates: actor=0.0001, critic=0.0003
+  Device: cuda
+)
+============================================================
+Training:   0%|          | 0/5000 [00:00<?, ?episode/s]Training:   0%|          | 0/5000 [00:00<?, ?episode/s]Training:   0%|          | 1/5000 [00:00<17:11,  4.84episode/s]Training:   0%|          | 1/5000 [00:00<17:11,  4.84episode/s]Training:   0%|          | 2/5000 [00:00<13:06,  6.35episode/s]Training:   0%|          | 2/5000 [00:00<13:06,  6.35episode/s]Training:   0%|          | 3/5000 [00:00<12:36,  6.61episode/s]Training:   0%|          | 3/5000 [00:00<12:36,  6.61episode/s]Training:   0%|          | 4/5000 [00:00<11:43,  7.11episode/s]Training:   0%|          | 4/5000 [00:00<11:43,  7.11episode/s]Training:   0%|          | 5/5000 [00:00<11:16,  7.38episode/s]Training:   0%|          | 5/5000 [00:00<11:16,  7.38episode/s]Training:   0%|          | 6/5000 [00:00<10:59,  7.57episode/s]Training:   0%|          | 6/5000 [00:00<10:59,  7.57episode/s]Training:   0%|          | 7/5000 [00:00<10:52,  7.65episode/s]Training:   0%|          | 7/5000 [00:01<10:52,  7.65episode/s]Training:   0%|          | 8/5000 [00:01<10:53,  7.64episode/s]Training:   0%|          | 8/5000 [00:01<10:53,  7.64episode/s]Training:   0%|          | 9/5000 [00:01<10:54,  7.63episode/s]Training:   0%|          | 9/5000 [00:01<10:54,  7.63episode/s]Training:   0%|          | 10/5000 [00:01<10:53,  7.64episode/s]Training:   0%|          | 10/5000 [00:01<10:53,  7.64episode/s]Training:   0%|          | 11/5000 [00:01<10:51,  7.65episode/s]Training:   0%|          | 11/5000 [00:01<10:51,  7.65episode/s]Training:   0%|          | 12/5000 [00:01<10:48,  7.69episode/s]Training:   0%|          | 12/5000 [00:01<10:48,  7.69episode/s]Training:   0%|          | 13/5000 [00:01<10:40,  7.79episode/s]Training:   0%|          | 13/5000 [00:01<10:40,  7.79episode/s]Training:   0%|          | 14/5000 [00:01<10:34,  7.86episode/s]Training:   0%|          | 14/5000 [00:02<10:34,  7.86episode/s]Training:   0%|          | 15/5000 [00:02<10:30,  7.91episode/s]Training:   0%|          | 15/5000 [00:02<10:30,  7.91episode/s]Training:   0%|          | 16/5000 [00:02<10:39,  7.79episode/s]Training:   0%|          | 16/5000 [00:02<10:39,  7.79episode/s]Training:   0%|          | 17/5000 [00:02<10:38,  7.80episode/s]Training:   0%|          | 17/5000 [00:02<10:38,  7.80episode/s]Training:   0%|          | 18/5000 [00:02<10:37,  7.82episode/s]Training:   0%|          | 18/5000 [00:02<10:37,  7.82episode/s]Training:   0%|          | 19/5000 [00:02<10:40,  7.78episode/s]Training:   0%|          | 19/5000 [00:02<10:40,  7.78episode/s]Training:   0%|          | 20/5000 [00:02<10:43,  7.73episode/s]Training:   0%|          | 20/5000 [00:08<10:43,  7.73episode/s]Training:   0%|          | 21/5000 [00:08<2:40:20,  1.93s/episode]Training:   0%|          | 21/5000 [00:15<2:40:20,  1.93s/episode]Training:   0%|          | 22/5000 [00:15<4:28:21,  3.23s/episode]

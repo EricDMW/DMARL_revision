@@ -1,0 +1,26 @@
+
+============================================================
+DMARL for Wireless Communication Environment
+============================================================
+Mode: train
+Grid: 5 x 5
+Agents: 25
+Device: cuda
+Seed: 4000
+============================================================
+
+============================================================
+TRAINING MODE
+============================================================
+============================================================
+Starting DMARL Training for Wireless Communication
+============================================================
+Config(
+  Environment: 5x5 grid, 25 agents
+  Neighborhoods: κ_o=1, κ_r=1
+  Training: 50 episodes, batch_size=256
+  Learning rates: actor=0.0001, critic=0.0003
+  Device: cuda
+)
+============================================================
+Training:   0%|          | 0/50 [00:00<?, ?episode/s]Training:   0%|          | 0/50 [00:01<?, ?episode/s]Training:   2%|▏         | 1/50 [00:01<00:50,  1.04s/episode]Training:   2%|▏         | 1/50 [00:02<00:50,  1.04s/episode]Training:   4%|▍         | 2/50 [00:02<00:47,  1.00episode/s]Training:   4%|▍         | 2/50 [00:02<00:47,  1.00episode/s]Training:   6%|▌         | 3/50 [00:02<00:46,  1.02episode/s]Training:   6%|▌         | 3/50 [00:03<00:46,  1.02episode/s]Training:   8%|▊         | 4/50 [00:03<00:44,  1.03episode/s]Training:   8%|▊         | 4/50 [00:04<00:44,  1.03episode/s]Training:  10%|█         | 5/50 [00:04<00:43,  1.03episode/s]Training:  10%|█         | 5/50 [00:05<00:43,  1.03episode/s]Training:  12%|█▏        | 6/50 [00:05<00:42,  1.03episode/s]Training:  12%|█▏        | 6/50 [00:06<00:42,  1.03episode/s]Training:  14%|█▍        | 7/50 [00:06<00:41,  1.03episode/s]Training:  14%|█▍        | 7/50 [00:07<00:41,  1.03episode/s]Training:  16%|█▌        | 8/50 [00:07<00:40,  1.03episode/s]Training:  16%|█▌        | 8/50 [00:08<00:40,  1.03episode/s]Training:  18%|█▊        | 9/50 [00:08<00:40,  1.02episode/s]Training:  18%|█▊        | 9/50 [00:09<00:40,  1.02episode/s]Training:  20%|██        | 10/50 [00:09<00:38,  1.03episode/s]Training:  20%|██        | 10/50 [00:10<00:38,  1.03episode/s]Training:  22%|██▏       | 11/50 [00:10<00:37,  1.04episode/s]Training:  22%|██▏       | 11/50 [00:11<00:37,  1.04episode/s]Training:  24%|██▍       | 12/50 [00:11<00:36,  1.03episode/s]Training:  24%|██▍       | 12/50 [00:12<00:36,  1.03episode/s]Training:  26%|██▌       | 13/50 [00:12<00:35,  1.03episode/s]Training:  26%|██▌       | 13/50 [00:13<00:35,  1.03episode/s]Training:  28%|██▊       | 14/50 [00:13<00:34,  1.04episode/s]Training:  28%|██▊       | 14/50 [00:14<00:34,  1.04episode/s]Training:  30%|███       | 15/50 [00:14<00:33,  1.04episode/s]Training:  30%|███       | 15/50 [00:15<00:33,  1.04episode/s]Training:  32%|███▏      | 16/50 [00:15<00:32,  1.03episode/s]Training:  32%|███▏      | 16/50 [00:16<00:32,  1.03episode/s]Training:  34%|███▍      | 17/50 [00:16<00:32,  1.03episode/s]Training:  34%|███▍      | 17/50 [00:17<00:32,  1.03episode/s]Training:  36%|███▌      | 18/50 [00:17<00:30,  1.04episode/s]Training:  36%|███▌      | 18/50 [00:18<00:30,  1.04episode/s]Training:  38%|███▊      | 19/50 [00:18<00:30,  1.03episode/s]Training:  38%|███▊      | 19/50 [00:19<00:30,  1.03episode/s]Training:  40%|████      | 20/50 [00:19<00:28,  1.04episode/s]

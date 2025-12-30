@@ -1,0 +1,996 @@
+\documentclass[11pt,a4paper]{article}
+
+% ============================================================================
+% PACKAGES
+% ============================================================================
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{mathtools}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{enumitem}
+\usepackage{geometry}
+\usepackage{hyperref}
+\usepackage{cleveref}
+\usepackage{xcolor}
+\usepackage{tcolorbox}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+
+% ============================================================================
+% PAGE SETUP
+% ============================================================================
+\geometry{margin=1in}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\leftmark}
+\fancyhead[R]{Neural Network Actor-Critic for NMARL}
+\fancyfoot[C]{\thepage}
+
+% ============================================================================
+% THEOREM ENVIRONMENTS
+% ============================================================================
+\theoremstyle{definition}
+\newtheorem{definition}{Definition}[section]
+\newtheorem{assumption}{Assumption}[section]
+\newtheorem{remark}{Remark}[section]
+
+\theoremstyle{plain}
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{corollary}[theorem]{Corollary}
+
+% ============================================================================
+% CUSTOM COMMANDS
+% ============================================================================
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\Prob}{\mathbb{P}}
+\newcommand{\cN}{\mathcal{N}}
+\newcommand{\cS}{\mathcal{S}}
+\newcommand{\cA}{\mathcal{A}}
+\newcommand{\cF}{\mathcal{F}}
+\newcommand{\cO}{\mathcal{O}}
+\newcommand{\btheta}{\boldsymbol{\theta}}
+\newcommand{\bomega}{\boldsymbol{\omega}}
+\newcommand{\bphi}{\boldsymbol{\phi}}
+\newcommand{\inner}[2]{\langle #1, #2 \rangle}
+\newcommand{\norm}[1]{\left\| #1 \right\|}
+\newcommand{\abs}[1]{\left| #1 \right|}
+
+% Colored boxes for implementation notes
+\newtcolorbox{implnote}[1][]{
+  colback=blue!5!white,
+  colframe=blue!75!black,
+  fonttitle=\bfseries,
+  title=Implementation Note,
+  #1
+}
+
+\newtcolorbox{keypoint}[1][]{
+  colback=green!5!white,
+  colframe=green!50!black,
+  fonttitle=\bfseries,
+  title=Key Point,
+  #1
+}
+
+\newtcolorbox{warning}[1][]{
+  colback=red!5!white,
+  colframe=red!75!black,
+  fonttitle=\bfseries,
+  title=Warning,
+  #1
+}
+
+% ============================================================================
+% DOCUMENT INFO
+% ============================================================================
+\title{\textbf{Implementation Manual: Neural Network Actor-Critic for Networked Multi-Agent Reinforcement Learning under Asymmetric Information}}
+\author{Technical Reference Document}
+\date{\today}
+
+% ============================================================================
+% DOCUMENT BEGIN
+% ============================================================================
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+This manual provides a complete specification for extending the distributed and scalable algorithm for Networked Multi-Agent Reinforcement Learning (NMARL) under asymmetric information from tabular Q-learning to neural network-based actor-critic methods. The document preserves the original asymmetric information structure while addressing scalability limitations through function approximation. All theoretical modifications and implementation guidelines are provided for direct implementation.
+\end{abstract}
+
+\tableofcontents
+\newpage
+
+% ============================================================================
+% SECTION 1: INTRODUCTION AND MOTIVATION
+% ============================================================================
+\section{Introduction and Motivation}
+
+\subsection{Problem Statement}
+
+The original Algorithm 1 uses a tabular update for the truncated neighbors-averaged Q-function. The computational and storage complexity per agent $i$ is:
+\begin{equation}
+\cO\left(\prod_{j \in \cN_i^{\kappa_o^i}} |\cS_j| \cdot \prod_{j \in \cN_i^{\kappa_o^i}} |\cA_j|\right)
+\end{equation}
+
+This grows \textbf{exponentially} with the neighborhood size $|\cN_i^{\kappa_o^i}|$, making the algorithm impractical for large-scale networks.
+
+\subsection{Solution Overview}
+
+Replace the tabular representation with neural network function approximators:
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Critic Network:} $\hat{Q}_i^{\omega_i}(s_{\cN_i^{\kappa_o^i}}, a_{\cN_i^{\kappa_o^i}})$ parameterized by $\omega_i \in \R^{d_\omega}$
+    \item \textbf{Actor Network:} $\pi_i(a_i|s_i; \theta_i)$ parameterized by $\theta_i \in \R^{d_\theta^i}$
+\end{itemize}
+
+\subsection{Preserved Elements}
+
+The following core elements from the original paper remain \textbf{unchanged}:
+
+\begin{table}[h]
+\centering
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{Component} & \textbf{Description} & \textbf{Reference} \\
+\midrule
+Information structure & Agent $i$ observes $\kappa_o^i$-hop, receives $\kappa_r^i$-hop rewards & Assumption 1 \\
+Truncated neighbors-averaged Q & $\widetilde{Q}_{tru,i}^{\pi_\theta}(s_{\cN_i^{\kappa_o^i}}, a_{\cN_i^{\kappa_o^i}})$ & Equation (8) \\
+Approximated policy gradient & $g_{app,i}^{\pi_\theta}$ & Equation (10) \\
+No Q-value exchange & Agents do not share learned Q-functions & Remark 1 \\
+Equivalence result & $g_{tru,i}^{\pi_\theta} = g_{app,i}^{\pi_\theta}$ & Lemma 6 \\
+\bottomrule
+\end{tabular}
+\caption{Preserved elements from the original algorithm}
+\end{table}
+
+% ============================================================================
+% SECTION 2: NETWORK ARCHITECTURE
+% ============================================================================
+\section{Network Architecture Specification}
+
+\subsection{Agent Network Structure}
+
+Each agent $i \in \cN$ maintains the following networks:
+
+\begin{keypoint}
+Each agent $i$ has three network components:
+\begin{enumerate}
+    \item \textbf{Actor Network:} $\pi_i(a_i|s_i; \theta_i)$ --- local policy
+    \item \textbf{Critic Network:} $\hat{Q}_i^{\omega_i}(s_{\cN_i^{\kappa_o^i}}, a_{\cN_i^{\kappa_o^i}})$ --- Q-function estimate
+    \item \textbf{Target Critic Network:} $\hat{Q}_i^{\omega_i^-}$ --- for stable TD targets
+\end{enumerate}
+\end{keypoint}
+
+\subsection{Critic Network Design}
+
+\begin{definition}[Parameterized Truncated Neighbors-Averaged Q-function]
+For each agent $i \in \cN$, define the parameterized Q-function as:
+\begin{equation}
+\hat{Q}_i^{\omega_i}: \cS_{\cN_i^{\kappa_o^i}} \times \cA_{\cN_i^{\kappa_o^i}} \to \R
+\end{equation}
+where $\omega_i \in \Omega_i \subseteq \R^{d_\omega}$ is the parameter vector.
+\end{definition}
+
+\subsubsection{Input Specification}
+
+The critic network input consists of:
+\begin{align}
+\text{State input:} \quad & s_{\cN_i^{\kappa_o^i}} \in \R^{d_s \cdot |\cN_i^{\kappa_o^i}|}  \\
+\text{Action input:} \quad & a_{\cN_i^{\kappa_o^i}} \in \R^{d_a \cdot |\cN_i^{\kappa_o^i}|}
+\end{align}
+
+The total input dimension is:
+\begin{equation}
+d_{\text{input}}^{\text{critic}} = (d_s + d_a) \cdot |\cN_i^{\kappa_o^i}|
+\end{equation}
+
+\subsubsection{Network Architecture}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{@{}llll@{}}
+\toprule
+\textbf{Layer} & \textbf{Input Dim} & \textbf{Output Dim} & \textbf{Activation} \\
+\midrule
+Input & --- & $d_{\text{input}}^{\text{critic}}$ & --- \\
+Hidden 1 & $d_{\text{input}}^{\text{critic}}$ & $h_1$ & ReLU \\
+Hidden 2 & $h_1$ & $h_2$ & ReLU \\
+Hidden 3 (optional) & $h_2$ & $h_3$ & ReLU \\
+Output & $h_{\text{last}}$ & 1 & None \\
+\bottomrule
+\end{tabular}
+\caption{Critic network architecture}
+\end{table}
+
+\begin{implnote}
+Recommended hidden layer dimensions:
+\begin{itemize}
+    \item $h_1 = 256$
+    \item $h_2 = 128$  
+    \item $h_3 = 64$ (optional, for complex problems)
+\end{itemize}
+\end{implnote}
+
+\subsubsection{Linear Function Approximation Alternative}
+
+For stronger theoretical guarantees, use linear function approximation:
+\begin{equation}
+\hat{Q}_i^{\omega_i}(s_{\cN_i^{\kappa_o^i}}, a_{\cN_i^{\kappa_o^i}}) = \omega_i^\top \phi_i(s_{\cN_i^{\kappa_o^i}}, a_{\cN_i^{\kappa_o^i}})
+\label{eq:linear_fa}
+\end{equation}
+where $\phi_i: \cS_{\cN_i^{\kappa_o^i}} \times \cA_{\cN_i^{\kappa_o^i}} \to \R^{d_\omega}$ is a feature mapping.
+
+\textbf{Feature Design Options:}
+\begin{enumerate}
+    \item \textbf{Polynomial features:}
+    \begin{equation}
+    \phi_i(s, a) = [1, s_1, \ldots, s_n, a_1, \ldots, a_m, s_1 s_2, \ldots]^\top
+    \end{equation}
+    
+    \item \textbf{Fourier basis features:}
+    \begin{equation}
+    \phi_i^{(k)}(s, a) = \cos(\pi c_k^\top [s; a])
+    \end{equation}
+    
+    \item \textbf{Tile coding features:} Binary features indicating active tiles in discretized space.
+\end{enumerate}
+
+\subsection{Actor Network Design}
+
+\begin{definition}[Parameterized Policy]
+For each agent $i \in \cN$, the local policy is parameterized as:
+\begin{equation}
+\pi_i(a_i|s_i; \theta_i), \quad \theta_i \in \R^{d_\theta^i}
+\end{equation}
+\end{definition}
+
+\begin{warning}
+The actor network depends \textbf{only on local state} $s_i$, not on neighbor information. This preserves decentralized execution.
+\end{warning}
+
+\subsubsection{Softmax Policy (Discrete Actions)}
+
+For discrete action spaces $\cA_i = \{1, 2, \ldots, |\cA_i|\}$:
+\begin{equation}
+\pi_i(a_i|s_i; \theta_i) = \frac{\exp(f_{\theta_i}(s_i, a_i))}{\sum_{a_i' \in \cA_i} \exp(f_{\theta_i}(s_i, a_i'))}
+\label{eq:softmax_policy}
+\end{equation}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{@{}llll@{}}
+\toprule
+\textbf{Layer} & \textbf{Input Dim} & \textbf{Output Dim} & \textbf{Activation} \\
+\midrule
+Input & --- & $d_s$ & --- \\
+Hidden 1 & $d_s$ & $h_1$ & ReLU \\
+Hidden 2 & $h_1$ & $h_2$ & ReLU \\
+Output & $h_2$ & $|\cA_i|$ & Softmax \\
+\bottomrule
+\end{tabular}
+\caption{Actor network architecture (discrete actions)}
+\end{table}
+
+\subsubsection{Gaussian Policy (Continuous Actions)}
+
+For continuous action spaces:
+\begin{equation}
+\pi_i(a_i|s_i; \theta_i) = \cN(\mu_{\theta_i}(s_i), \sigma_{\theta_i}^2(s_i))
+\label{eq:gaussian_policy}
+\end{equation}
+
+% ============================================================================
+% SECTION 3: UPDATE RULES
+% ============================================================================
+\section{Update Rules}
+
+This section specifies the modified update rules that replace equations (11)-(13) in the original paper.
+
+\subsection{Notation Summary}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{@{}ll@{}}
+\toprule
+\textbf{Symbol} & \textbf{Description} \\
+\midrule
+$\omega_i$ & Critic network parameters for agent $i$ \\
+$\omega_i^-$ & Target critic network parameters for agent $i$ \\
+$\theta_i$ & Actor network parameters for agent $i$ \\
+$\alpha_t$ & Critic learning rate at time $t$ \\
+$\eta_m$ & Actor learning rate at episode $m$ \\
+$\tau$ & Target network soft update coefficient \\
+$\gamma$ & Discount factor \\
+$\bar{r}_{i,t}$ & Truncated reward: $\frac{1}{N}\sum_{j \in \cN_i^{\kappa_r^i}} r_j(s_{j,t}, a_{j,t})$ \\
+\bottomrule
+\end{tabular}
+\caption{Notation for update rules}
+\end{table}
+
+\subsection{Critic Update Rule}
+
+\subsubsection{Original Tabular Update (Equation 11)}
+
+The original tabular update is:
+\begin{equation}
+\hat{Q}_{i,t}^{\pi_{\theta_m}}(s_{\cN_i^{\kappa_o^i}}, a_{\cN_i^{\kappa_o^i}}) = 
+\begin{cases}
+(1-\alpha_{t-1})\hat{Q}_{i,t-1}^{\pi_{\theta_m}} + \alpha_{t-1}\left[\bar{r}_i + \gamma \hat{Q}_{i,t-1}^{\pi_{\theta_m}}(s'_{\cN_i^{\kappa_o^i}}, a'_{\cN_i^{\kappa_o^i}})\right], & \text{if visited} \\
+\hat{Q}_{i,t-1}^{\pi_{\theta_m}}(s_{\cN_i^{\kappa_o^i}}, a_{\cN_i^{\kappa_o^i}}), & \text{otherwise}
+\end{cases}
+\tag{11}
+\end{equation}
+
+\subsubsection{Modified Parametric Update (Equation 11')}
+
+\begin{keypoint}[title=Modified Critic Update]
+The new critic update rule is:
+\begin{equation}
+\boxed{
+\omega_{i,t+1} = \omega_{i,t} + \alpha_t \delta_{i,t} \nabla_{\omega_i} \hat{Q}_i^{\omega_i}(s_{\cN_i^{\kappa_o^i}, t}, a_{\cN_i^{\kappa_o^i}, t})
+}
+\tag{11'}
+\end{equation}
+\end{keypoint}
+
+where the \textbf{TD error} is defined as:
+\begin{equation}
+\delta_{i,t} = \underbrace{\frac{1}{N}\sum_{j \in \cN_i^{\kappa_r^i}} r_j(s_{j,t}, a_{j,t})}_{\text{truncated reward } \bar{r}_{i,t}} + \gamma \hat{Q}_i^{\omega_i^-}(s_{\cN_i^{\kappa_o^i}, t+1}, a_{\cN_i^{\kappa_o^i}, t+1}) - \hat{Q}_i^{\omega_i}(s_{\cN_i^{\kappa_o^i}, t}, a_{\cN_i^{\kappa_o^i}, t})
+\label{eq:td_error}
+\end{equation}
+
+\begin{implnote}
+For \textbf{linear function approximation} \eqref{eq:linear_fa}, the update simplifies to:
+\begin{equation}
+\omega_{i,t+1} = \omega_{i,t} + \alpha_t \delta_{i,t} \phi_i(s_{\cN_i^{\kappa_o^i}, t}, a_{\cN_i^{\kappa_o^i}, t})
+\tag{11''}
+\end{equation}
+\end{implnote}
+
+\subsubsection{Gradient Computation}
+
+For neural network critic, compute:
+\begin{equation}
+\nabla_{\omega_i} \hat{Q}_i^{\omega_i}(s_{\cN_i^{\kappa_o^i}}, a_{\cN_i^{\kappa_o^i}}) = \frac{\partial \hat{Q}_i^{\omega_i}}{\partial \omega_i}
+\end{equation}
+
+This is obtained via backpropagation through the critic network.
+
+\subsection{Target Network Update}
+
+\begin{keypoint}[title=Target Network Soft Update]
+To stabilize training, introduce target parameters $\omega_i^-$ with soft update:
+\begin{equation}
+\boxed{
+\omega_i^- \leftarrow \tau \omega_i + (1-\tau) \omega_i^-
+}
+\tag{14'}
+\end{equation}
+where $\tau \in (0,1)$ is the soft update coefficient.
+\end{keypoint}
+
+\begin{implnote}
+Recommended value: $\tau = 0.005$ (update slowly for stability).
+\end{implnote}
+
+\subsection{Actor Update Rule}
+
+\subsubsection{Original Policy Gradient Estimate (Equation 12)}
+
+The original estimate is:
+\begin{equation}
+\hat{g}_i^{\pi_{\theta_m}} = \sum_{t=0}^{T} \gamma^t \hat{Q}_{i,T}^{\pi_{\theta_m}}(s_{\cN_i^{\kappa_o^i}, t}, a_{\cN_i^{\kappa_o^i}, t}) \nabla_{\theta_i} \log \pi_i(a_{i,t}|s_{i,t}, \theta_{i,m})
+\tag{12}
+\end{equation}
+
+\subsubsection{Modified Policy Gradient Estimate (Equation 12')}
+
+\begin{keypoint}[title=Modified Policy Gradient Estimate]
+The new policy gradient estimate is:
+\begin{equation}
+\boxed{
+\hat{g}_i^{\pi_{\theta_m}} = \sum_{t=0}^{T} \gamma^t \hat{Q}_i^{\omega_{i,T}}(s_{\cN_i^{\kappa_o^i}, t}, a_{\cN_i^{\kappa_o^i}, t}) \nabla_{\theta_i} \log \pi_i(a_{i,t}|s_{i,t}; \theta_{i,m})
+}
+\tag{12'}
+\end{equation}
+\end{keypoint}
+
+The only change is using the \textbf{parameterized} Q-function $\hat{Q}_i^{\omega_{i,T}}$ instead of the tabular $\hat{Q}_{i,T}^{\pi_{\theta_m}}$.
+
+\subsubsection{Policy Parameter Update (Equation 13)}
+
+The policy parameter update remains \textbf{unchanged}:
+\begin{equation}
+\boxed{
+\theta_{i,m+1} = \theta_{i,m} + \eta_m \hat{g}_i^{\pi_{\theta_m}}
+}
+\tag{13}
+\end{equation}
+
+with learning rate schedule:
+\begin{equation}
+\eta_m = \frac{\eta}{\sqrt{m+1}}
+\end{equation}
+
+\subsection{Summary of Update Rules}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{@{}p{3cm}p{5.5cm}p{5.5cm}@{}}
+\toprule
+\textbf{Component} & \textbf{Original (Tabular)} & \textbf{Modified (Neural Network)} \\
+\midrule
+Critic Update & Table entry update (11) & Parameter gradient update (11') \\
+Target Network & Not used & Soft update (14') \\
+Policy Gradient & Uses $\hat{Q}_{i,T}^{\pi_{\theta_m}}$ (12) & Uses $\hat{Q}_i^{\omega_{i,T}}$ (12') \\
+Policy Update & Equation (13) & Equation (13) --- unchanged \\
+\bottomrule
+\end{tabular}
+\caption{Comparison of update rules}
+\end{table}
+
+% ============================================================================
+% SECTION 4: ADDITIONAL ASSUMPTIONS
+% ============================================================================
+\section{Additional Assumptions}
+
+To establish convergence guarantees for the neural network version, we introduce three additional assumptions.
+
+\subsection{Original Assumptions (Unchanged)}
+
+The following assumptions from the original paper remain in effect:
+\begin{itemize}
+    \item \textbf{Assumption 1:} Asymmetric information structure ($\kappa_o^i$, $\kappa_r^i$)
+    \item \textbf{Assumption 2:} Ergodicity of Markov chain
+    \item \textbf{Assumption 3:} Bounded rewards ($|r_{i,t}| \leq R$)
+    \item \textbf{Assumption 4:} Policy regularity ($\|\nabla_{\theta_i} \log \pi_i\| \leq B$, $L$-Lipschitz gradient)
+    \item \textbf{Assumption 5:} Exponential mixing
+\end{itemize}
+
+\subsection{New Assumptions for Function Approximation}
+
+\begin{assumption}[Feature Regularity]
+\label{assump:feature}
+For each agent $i \in \cN$, the feature mapping $\phi_i$ (or neural network) satisfies:
+\begin{enumerate}
+    \item \textbf{Boundedness:} $\|\phi_i(s_{\cN_i^{\kappa_o^i}}, a_{\cN_i^{\kappa_o^i}})\| \leq L_\phi$ for all state-action pairs
+    \item \textbf{Linear independence:} The feature vectors $\{\phi_i(s, a)\}_{(s,a)}$ span $\R^{d_\omega}$
+\end{enumerate}
+\end{assumption}
+
+\begin{assumption}[Approximation Capability]
+\label{assump:approx}
+There exists $\epsilon_{\text{approx}} \geq 0$ such that for any joint policy $\pi_\theta$:
+\begin{equation}
+\min_{\omega_i \in \Omega_i} \E_{(s,a) \sim \xi_\rho^{\pi_\theta}}\left[\left(\widetilde{Q}_{tru,i}^{\pi_\theta}(s_{\cN_i^{\kappa_o^i}}, a_{\cN_i^{\kappa_o^i}}) - \hat{Q}_i^{\omega_i}(s_{\cN_i^{\kappa_o^i}}, a_{\cN_i^{\kappa_o^i}})\right)^2\right] \leq \epsilon_{\text{approx}}
+\end{equation}
+\end{assumption}
+
+\begin{assumption}[Parameter Boundedness]
+\label{assump:bounded}
+The parameter space $\Omega_i$ is compact with $\sup_{\omega_i \in \Omega_i} \|\omega_i\| \leq W$ for some $W > 0$.
+\end{assumption}
+
+\begin{implnote}
+In practice, Assumption~\ref{assump:bounded} is enforced via:
+\begin{itemize}
+    \item Weight clipping: $\omega_i \leftarrow \text{clip}(\omega_i, -W, W)$
+    \item Weight decay regularization in the optimizer
+    \item Gradient clipping: $\nabla_{\omega_i} \leftarrow \text{clip}(\nabla_{\omega_i}, -G, G)$
+\end{itemize}
+\end{implnote}
+
+% ============================================================================
+% SECTION 5: CONVERGENCE ANALYSIS
+% ============================================================================
+\section{Convergence Analysis Modifications}
+
+This section details the modifications to the convergence theorems.
+
+\subsection{Modified Theorem 1: Critic Convergence}
+
+\subsubsection{Original Result}
+
+\textbf{Theorem 1 (Original):} Under Assumptions 2-5, with probability at least $1-\delta$:
+\begin{equation}
+\sup_{(s,a) \in \cS \times \cA} \left|\hat{Q}_{i,T}^{\pi_{\theta_m}}(s_{\cN_i^{\kappa_o^i}}, a_{\cN_i^{\kappa_o^i}}) - \widetilde{Q}_{tru,i}^{\pi_{\theta_m}}(s_{\cN_i^{\kappa_o^i}}, a_{\cN_i^{\kappa_o^i}})\right| \leq \frac{C_a(\delta)}{\sqrt{T+t_0}} + \frac{C_b}{T+t_0} + \frac{2R}{(1-\gamma)^2}\gamma^{\kappa_o^i - \kappa_r^i + 1}
+\tag{24}
+\end{equation}
+
+\subsubsection{Modified Result}
+
+\begin{theorem}[Modified Critic Convergence]
+\label{thm:critic_modified}
+Under Assumptions 2-5 and \ref{assump:feature}-\ref{assump:bounded}, with learning rate $\alpha_t = \frac{h}{t+t_0}$ satisfying $h \geq \frac{2}{\sigma'(1-\gamma)\lambda_{\min}}$, we have with probability at least $1-\delta$:
+\begin{equation}
+\boxed{
+\left\|\hat{Q}_i^{\omega_{i,T}} - \Pi_i \widetilde{Q}_{tru,i}^{\pi_{\theta_m}}\right\|_{\bar{\zeta}_\rho^{\pi_\theta}} \leq \underbrace{\frac{C_a'(\delta)}{\sqrt{T+t_0}} + \frac{C_b'}{T+t_0}}_{\text{sampling error}} + \underbrace{\frac{2R}{(1-\gamma)^2}\gamma^{\kappa_o^i - \kappa_r^i + 1}}_{\text{truncation bias}}
+}
+\tag{24'}
+\end{equation}
+where:
+\begin{itemize}
+    \item $\Pi_i$ is the projection operator onto the function class
+    \item $\|\cdot\|_{\bar{\zeta}_\rho^{\pi_\theta}}$ is the weighted $L_2$ norm under distribution $\bar{\zeta}_\rho^{\pi_\theta}$
+    \item $\lambda_{\min}$ is the minimum eigenvalue of the feature covariance matrix
+\end{itemize}
+\end{theorem}
+
+\begin{keypoint}
+The key difference: convergence is to the \textbf{projected} Q-function $\Pi_i \widetilde{Q}_{tru,i}^{\pi_{\theta_m}}$ rather than the exact Q-function. The projection error is bounded by $\sqrt{\epsilon_{\text{approx}}}$.
+\end{keypoint}
+
+\subsection{Modified Theorem 2: Policy Gradient Error}
+
+\subsubsection{Original Result}
+
+\textbf{Theorem 2 (Original):}
+\begin{equation}
+\left\|g_{app,i}^{\pi_\theta} - \nabla_{\theta_i} J(\theta)\right\| \leq \frac{BR}{(1-\gamma)^2}\gamma^{\kappa_r^i + 1}
+\tag{31}
+\end{equation}
+
+\subsubsection{Modified Result}
+
+\begin{theorem}[Modified Policy Gradient Error]
+\label{thm:pg_modified}
+Under Assumptions 2-5 and \ref{assump:feature}-\ref{assump:bounded}, the approximated policy gradient satisfies:
+\begin{equation}
+\boxed{
+\left\|\hat{g}_{app,i}^{\pi_\theta} - \nabla_{\theta_i} J(\theta)\right\| \leq \underbrace{\frac{BR}{(1-\gamma)^2}\gamma^{\kappa_r^i + 1}}_{\text{truncation error (unchanged)}} + \underbrace{\frac{B\sqrt{\epsilon_{\text{approx}}}}{1-\gamma}}_{\text{function approximation error}}
+}
+\tag{31'}
+\end{equation}
+\end{theorem}
+
+\subsection{Modified Theorem 3: Overall Convergence}
+
+\subsubsection{Original Result}
+
+\textbf{Theorem 3 (Original):} With probability at least $1-\delta$:
+\begin{equation}
+\frac{\sum_{m=0}^{M-1} \eta_m \|\nabla_\theta J(\theta_m)\|^2}{\sum_{m=0}^{M-1} \eta_m} \leq \underbrace{\cO\left(\frac{1}{\sqrt{M}}\right)}_{\text{(i)}} + \underbrace{\frac{4B^2\sqrt{N}R^2}{(1-\gamma)^4}\gamma^{\min_i\{\kappa_r^i\}+1}}_{\text{(ii)}} + \underbrace{\frac{6B^2\sqrt{N}R^2}{(1-\gamma)^5}\gamma^{\min_i\{\kappa_o^i - \kappa_r^i\}+1}}_{\text{(iii)}}
+\tag{32}
+\end{equation}
+
+\subsubsection{Modified Result}
+
+\begin{theorem}[Modified Overall Convergence]
+\label{thm:overall_modified}
+Under Assumptions 2-5 and \ref{assump:feature}-\ref{assump:bounded}, with learning rates $\eta_m = \frac{\eta}{\sqrt{m+1}}$ and $\alpha_t = \frac{h}{t+t_0}$, with probability at least $1-\delta$:
+\begin{equation}
+\boxed{
+\begin{aligned}
+\frac{\sum_{m=0}^{M-1} \eta_m \|\nabla_\theta J(\theta_m)\|^2}{\sum_{m=0}^{M-1} \eta_m} \leq & \underbrace{\cO\left(\frac{1}{\sqrt{M}}\right)}_{\text{(i) optimization}} + \underbrace{\frac{4B^2\sqrt{N}R^2}{(1-\gamma)^4}\gamma^{\min_i\{\kappa_r^i\}+1}}_{\text{(ii) policy gradient truncation}} \\
+& + \underbrace{\frac{6B^2\sqrt{N}R^2}{(1-\gamma)^5}\gamma^{\min_i\{\kappa_o^i - \kappa_r^i\}+1}}_{\text{(iii) critic truncation}} + \underbrace{\frac{C_3 B^2 \epsilon_{\text{approx}}}{(1-\gamma)^4}}_{\text{(iv) function approximation}}
+\end{aligned}
+}
+\tag{32'}
+\end{equation}
+where $C_3 > 0$ is a constant depending on problem parameters.
+\end{theorem}
+
+\subsection{Error Term Comparison}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{@{}llll@{}}
+\toprule
+\textbf{Term} & \textbf{Original} & \textbf{Modified} & \textbf{Change} \\
+\midrule
+(i) Optimization & $\cO(1/\sqrt{M})$ & $\cO(1/\sqrt{M})$ & Unchanged \\
+(ii) Policy gradient & $\cO(\gamma^{\min_i\{\kappa_r^i\}+1})$ & $\cO(\gamma^{\min_i\{\kappa_r^i\}+1})$ & Unchanged \\
+(iii) Critic truncation & $\cO(\gamma^{\min_i\{\kappa_o^i-\kappa_r^i\}+1})$ & $\cO(\gamma^{\min_i\{\kappa_o^i-\kappa_r^i\}+1})$ & Unchanged \\
+(iv) Function approx. & N/A & $\cO(\epsilon_{\text{approx}})$ & \textbf{New term} \\
+\bottomrule
+\end{tabular}
+\caption{Comparison of error terms in convergence bound}
+\end{table}
+
+\begin{keypoint}
+The function approximation error $\epsilon_{\text{approx}}$ should satisfy:
+\begin{equation}
+\epsilon_{\text{approx}} \leq \cO\left(\gamma^{2\min_i\{\kappa_r^i\}+2}\right)
+\end{equation}
+to ensure term (iv) does not dominate terms (ii) and (iii).
+\end{keypoint}
+
+% ============================================================================
+% SECTION 6: MODIFIED LEMMAS
+% ============================================================================
+\section{Modified Supporting Lemmas}
+
+\subsection{Modified Lemma 4: Bellman Operator Properties}
+
+\subsubsection{Original Lemma 4}
+
+\textbf{Lemma 4 (Original):} The operator $F^i(\cdot)$ is a $\gamma$-contraction mapping with respect to $\|\cdot\|_\infty$.
+
+\subsubsection{Modified Lemma 4}
+
+\begin{lemma}[Projected Bellman Operator]
+\label{lemma:projected_bellman}
+Under Assumptions 2-5 and \ref{assump:feature}-\ref{assump:bounded}:
+\begin{enumerate}
+    \item The projected Bellman operator $\Pi_i F^i$ is a $\gamma$-contraction in $\|\cdot\|_{\bar{\zeta}_\rho^{\pi_\theta}}$:
+    \begin{equation}
+    \|\Pi_i F^i(Q) - \Pi_i F^i(Q')\|_{\bar{\zeta}_\rho^{\pi_\theta}} \leq \gamma \|Q - Q'\|_{\bar{\zeta}_\rho^{\pi_\theta}}
+    \end{equation}
+    
+    \item There exists a unique fixed point $\omega_i^* \in \Omega_i$ such that:
+    \begin{equation}
+    \hat{Q}_i^{\omega_i^*} = \Pi_i \widetilde{Q}_{tru,i}^{\pi_\theta}
+    \end{equation}
+    
+    \item The noise $w_{t-1}^i$ satisfies:
+    \begin{equation}
+    \E[w_{t-1}^i | \cF_{t-1}] = 0, \quad \|w_{t-1}^i\| \leq \frac{2RL_\phi}{1-\gamma}
+    \end{equation}
+\end{enumerate}
+\end{lemma}
+
+\subsection{New Lemma: Approximation Error Propagation}
+
+\begin{lemma}[Approximation Error Propagation]
+\label{lemma:approx_error}
+The function approximation error propagates to the policy gradient as:
+\begin{equation}
+\left\|\E\left[(\hat{Q}_i^{\omega_i} - \widetilde{Q}_{tru,i}^{\pi_\theta})\nabla_{\theta_i}\log\pi_i\right]\right\| \leq \frac{B}{1-\gamma}\sqrt{\E\left[(\hat{Q}_i^{\omega_i} - \widetilde{Q}_{tru,i}^{\pi_\theta})^2\right]}
+\end{equation}
+\end{lemma}
+
+\begin{proof}[Proof Sketch]
+By Cauchy-Schwarz inequality and Assumption 4:
+\begin{align}
+\left\|\E\left[(\hat{Q}_i^{\omega_i} - \widetilde{Q}_{tru,i}^{\pi_\theta})\nabla_{\theta_i}\log\pi_i\right]\right\| &\leq \E\left[|\hat{Q}_i^{\omega_i} - \widetilde{Q}_{tru,i}^{\pi_\theta}| \cdot \|\nabla_{\theta_i}\log\pi_i\|\right] \\
+&\leq B \cdot \E\left[|\hat{Q}_i^{\omega_i} - \widetilde{Q}_{tru,i}^{\pi_\theta}|\right] \\
+&\leq B \sqrt{\E\left[(\hat{Q}_i^{\omega_i} - \widetilde{Q}_{tru,i}^{\pi_\theta})^2\right]} \\
+&\leq \frac{B\sqrt{\epsilon_{\text{approx}}}}{1-\gamma}
+\end{align}
+where the last step uses Assumption~\ref{assump:approx} and the normalization factor.
+\end{proof}
+
+% ============================================================================
+% SECTION 7: ALGORITHM STATEMENT
+% ============================================================================
+\section{Complete Algorithm Statement}
+
+\begin{algorithm}[H]
+\caption{Distributed Actor-Critic under Asymmetric Information}
+\label{alg:main}
+\begin{algorithmic}[1]
+\Require Initial parameters $\{\theta_{i,0}, \omega_{i,0}\}_{i \in \cN}$, episodes $M$, episode length $T$
+\Require Learning rates $\eta, h, t_0$, soft update rate $\tau$, discount factor $\gamma$
+\Ensure Joint policy $\pi_{\theta_M}$
+
+\For{$m = 0, 1, \ldots, M-1$} \Comment{Episode loop}
+    \State Sample initial state $s_0 \sim \rho$
+    \For{$i \in \cN$}
+        \State $a_{i,0} \sim \pi_i(\cdot|s_{i,0}; \theta_{i,m})$
+        \State $\omega_i^- \leftarrow \omega_{i,0}$ \Comment{Initialize target network}
+    \EndFor
+    
+    \Statex \textbf{// Distributed Critic Step}
+    \For{$t = 1, 2, \ldots, T$}
+        \For{$i \in \cN$}
+            \State Observe $s_{i,t}$, execute $a_{i,t} \sim \pi_i(\cdot|s_{i,t}; \theta_{i,m})$, receive $r_{i,t}$
+            \State Collect neighbor info: $(s_{\cN_i^{\kappa_o^i}, t-1}, a_{\cN_i^{\kappa_o^i}, t-1})$, $(s_{\cN_i^{\kappa_o^i}, t}, a_{\cN_i^{\kappa_o^i}, t})$
+            \State Compute truncated reward: $\bar{r}_{i,t-1} = \frac{1}{N}\sum_{j \in \cN_i^{\kappa_r^i}} r_{j,t-1}$
+            \State Compute TD error using \eqref{eq:td_error}
+            \State Update critic: $\omega_i \leftarrow \omega_i + \alpha_{t-1} \delta_{i,t-1} \nabla_{\omega_i} \hat{Q}_i^{\omega_i}(s_{\cN_i^{\kappa_o^i}, t-1}, a_{\cN_i^{\kappa_o^i}, t-1})$
+            \State Update target: $\omega_i^- \leftarrow \tau \omega_i + (1-\tau) \omega_i^-$
+        \EndFor
+    \EndFor
+    
+    \Statex \textbf{// Decentralized Actor Step}
+    \For{$i \in \cN$}
+        \State Compute policy gradient estimate:
+        \Statex \quad\quad $\hat{g}_i^{\pi_{\theta_m}} = \sum_{t=0}^{T} \gamma^t \hat{Q}_i^{\omega_{i,T}}(s_{\cN_i^{\kappa_o^i}, t}, a_{\cN_i^{\kappa_o^i}, t}) \nabla_{\theta_i} \log \pi_i(a_{i,t}|s_{i,t}; \theta_{i,m})$
+        \State Update actor: $\theta_{i,m+1} = \theta_{i,m} + \eta_m \hat{g}_i^{\pi_{\theta_m}}$ with $\eta_m = \frac{\eta}{\sqrt{m+1}}$
+    \EndFor
+\EndFor
+
+\State \Return $\pi_{\theta_M}$
+\end{algorithmic}
+\end{algorithm}
+
+% ============================================================================
+% SECTION 8: HYPERPARAMETERS
+% ============================================================================
+\section{Hyperparameter Guidelines}
+
+\subsection{Recommended Values}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{@{}llll@{}}
+\toprule
+\textbf{Parameter} & \textbf{Symbol} & \textbf{Recommended} & \textbf{Notes} \\
+\midrule
+Critic learning rate & $\alpha$ & $3 \times 10^{-4}$ & Base rate, decays as $\alpha_t = h/(t+t_0)$ \\
+Actor learning rate & $\eta$ & $1 \times 10^{-4}$ & Decays as $\eta_m = \eta/\sqrt{m+1}$ \\
+Target update rate & $\tau$ & $0.005$ & Soft update coefficient \\
+Discount factor & $\gamma$ & $0.9$ -- $0.99$ & Task dependent \\
+Batch size & --- & $64$ -- $256$ & For mini-batch updates \\
+Replay buffer size & --- & $10^5$ -- $10^6$ & For experience replay \\
+Episode length & $T$ & $\geq \min_i\{\kappa_r^i\}$ & Per Theorem 3 \\
+Hidden layer dims & --- & $[256, 128, 64]$ & For both actor/critic \\
+\bottomrule
+\end{tabular}
+\caption{Recommended hyperparameters}
+\end{table}
+
+\subsection{Learning Rate Schedules}
+
+\textbf{Critic (diminishing):}
+\begin{equation}
+\alpha_t = \frac{h}{t + t_0}, \quad h \geq \frac{2}{\sigma'(1-\gamma)\lambda_{\min}}
+\end{equation}
+
+\textbf{Actor (square root diminishing per Theorem 3):}
+\begin{equation}
+\eta_m = \frac{\eta}{\sqrt{m + 1}}, \quad \eta \leq \frac{1}{4L}
+\end{equation}
+
+\subsection{Stability Techniques}
+
+\begin{enumerate}
+    \item \textbf{Gradient clipping:}
+    \begin{equation}
+    \nabla \leftarrow \frac{\nabla}{\max(1, \|\nabla\|/G_{\max})}
+    \end{equation}
+    with $G_{\max} = 1.0$ recommended.
+    
+    \item \textbf{Layer normalization:} Apply after hidden layers for stable training.
+    
+    \item \textbf{Entropy regularization:}
+    \begin{equation}
+    \mathcal{L}_{\text{actor}} = -\hat{g}_i^{\pi_\theta} + \beta_H H(\pi_i(\cdot|s_i; \theta_i))
+    \end{equation}
+    where $\beta_H \approx 0.01$ and $H(\cdot)$ is the entropy.
+\end{enumerate}
+
+% ============================================================================
+% SECTION 9: COMPLEXITY ANALYSIS
+% ============================================================================
+\section{Complexity Analysis}
+
+\subsection{Space Complexity}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{Method} & \textbf{Storage per Agent} & \textbf{Scalability} \\
+\midrule
+Tabular (Original) & $\prod_{j \in \cN_i^{\kappa_o^i}} |\cS_j| \cdot |\cA_j|$ & Exponential in $|\cN_i^{\kappa_o^i}|$ \\
+Neural Network & $\cO(d_\omega + d_\theta)$ & Linear in network size \\
+\bottomrule
+\end{tabular}
+\caption{Space complexity comparison}
+\end{table}
+
+\subsection{Time Complexity per Update}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{Method} & \textbf{Critic Update} & \textbf{Actor Update} \\
+\midrule
+Tabular & $\cO(1)$ per entry & $\cO(T \cdot d_\theta)$ \\
+Neural Network & $\cO(d_\omega \cdot h_{\max})$ & $\cO(T \cdot d_\theta \cdot h_{\max})$ \\
+\bottomrule
+\end{tabular}
+\caption{Time complexity comparison}
+\end{table}
+
+where $h_{\max}$ is the maximum hidden layer dimension.
+
+% ============================================================================
+% SECTION 10: MODIFICATION TO SECTION V
+% ============================================================================
+\section{Modification to Optimal Upper Bound Analysis}
+
+\subsection{Extended Theorem 4}
+
+The analysis in Theorem 4 regarding the optimal reward usage range extends with an additional term.
+
+\textbf{Modified Condition for Case (i):}
+\begin{equation}
+\frac{4B^2\sqrt{N}R^2}{(1-\gamma)^4}\gamma^{\min_i\{\kappa_r^i\}+1} + \frac{C_3 B^2 \epsilon_{\text{approx}}}{(1-\gamma)^4} \geq \frac{6B^2\sqrt{N}R^2}{(1-\gamma)^5}\gamma^{\min_i\{\kappa_o^i - \kappa_r^i\}+1}
+\end{equation}
+
+\subsection{Implication}
+
+If $\epsilon_{\text{approx}}$ is sufficiently small, the counterintuitive phenomenon still holds:
+\begin{keypoint}
+\textbf{Counterintuitive Phenomenon (Preserved):} Increasing the accessible reward range may not always improve learning performance.
+\end{keypoint}
+
+The determination of $\kappa_{\min}^i$ follows the same logic as in the original Theorem 4, with the function approximation error $\epsilon_{\text{approx}}$ adding a constant offset to term (ii).
+
+% ============================================================================
+% SECTION 11: SUMMARY
+% ============================================================================
+\section{Summary of Changes}
+
+\subsection{What Changes}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{@{}p{3cm}p{5cm}p{5cm}@{}}
+\toprule
+\textbf{Section} & \textbf{Original} & \textbf{Modified} \\
+\midrule
+III-B, Eq. (11) & Tabular Q-update & Parametric TD update (11') \\
+III-B, Eq. (12) & Uses tabular $\hat{Q}_{i,T}$ & Uses parametric $\hat{Q}_i^{\omega_{i,T}}$ \\
+IV-A, Theorem 1 & Exact convergence & Projected convergence \\
+IV-B, Theorem 2 & Single error term & Additional $\sqrt{\epsilon_{\text{approx}}}$ term \\
+IV-C, Theorem 3 & Three error terms & Four error terms \\
+Assumptions & 1--5 & 1--8 (new: 6--8) \\
+\bottomrule
+\end{tabular}
+\caption{Summary of changes}
+\end{table}
+
+\subsection{What Remains Unchanged}
+
+\begin{itemize}
+    \item Assumption 1 (asymmetric information structure)
+    \item Definition of $\widetilde{Q}_{tru,i}^{\pi_\theta}$ in equation (8)
+    \item Definition of $g_{app,i}^{\pi_\theta}$ in equation (10)
+    \item Lemma 6 (equivalence of $g_{tru,i}^{\pi_\theta}$ and $g_{app,i}^{\pi_\theta}$)
+    \item No Q-value exchange between agents
+    \item The exponential decay property (Lemma 2)
+    \item The counterintuitive phenomenon (Section V)
+\end{itemize}
+
+% ============================================================================
+% APPENDIX
+% ============================================================================
+\appendix
+
+\section{Quick Reference Card}
+
+\subsection{Update Equations Summary}
+
+\textbf{TD Error:}
+\begin{equation}
+\delta_{i,t} = \bar{r}_{i,t} + \gamma \hat{Q}_i^{\omega_i^-}(s'_{\cN_i^{\kappa_o^i}}, a'_{\cN_i^{\kappa_o^i}}) - \hat{Q}_i^{\omega_i}(s_{\cN_i^{\kappa_o^i}}, a_{\cN_i^{\kappa_o^i}})
+\end{equation}
+
+\textbf{Critic Update:}
+\begin{equation}
+\omega_i \leftarrow \omega_i + \alpha_t \cdot \delta_{i,t} \cdot \nabla_{\omega_i} \hat{Q}_i^{\omega_i}(s_{\cN_i^{\kappa_o^i}}, a_{\cN_i^{\kappa_o^i}})
+\end{equation}
+
+\textbf{Target Update:}
+\begin{equation}
+\omega_i^- \leftarrow \tau \omega_i + (1-\tau) \omega_i^-
+\end{equation}
+
+\textbf{Policy Gradient:}
+\begin{equation}
+\hat{g}_i^{\pi_\theta} = \sum_{t=0}^{T} \gamma^t \hat{Q}_i^{\omega_i}(s_{\cN_i^{\kappa_o^i}, t}, a_{\cN_i^{\kappa_o^i}, t}) \nabla_{\theta_i} \log \pi_i(a_{i,t}|s_{i,t}; \theta_i)
+\end{equation}
+
+\textbf{Actor Update:}
+\begin{equation}
+\theta_i \leftarrow \theta_i + \eta_m \cdot \hat{g}_i^{\pi_\theta}
+\end{equation}
+
+\subsection{Information Flow Diagram}
+
+\begin{verbatim}
+For each agent i:
+
+    OBSERVE: (s_{N_i^{kappa_o^i}}, a_{N_i^{kappa_o^i}}) from kappa_o^i-hop neighbors
+                              |
+                              v
+                   +---------------------+
+                   |   Critic Network    |
+                   |   Q_i^{omega_i}     |
+                   +---------------------+
+                              |
+                              v
+    RECEIVE: rewards from kappa_r^i-hop neighbors
+             r_bar = (1/N) * sum_{j in N_i^{kappa_r^i}} r_j
+                              |
+                              v
+                   +---------------------+
+                   |   TD Error delta_i  |
+                   +---------------------+
+                              |
+              +---------------+---------------+
+              |                               |
+              v                               v
+    +-------------------+           +-------------------+
+    | Update omega_i    |           | Update omega_i^-  |
+    | (gradient step)   |           | (soft update)     |
+    +-------------------+           +-------------------+
+
+    LOCAL STATE: s_i only
+              |
+              v
+    +---------------------+
+    |   Actor Network     |
+    |   pi_i(a_i|s_i)     |
+    +---------------------+
+              |
+              v
+    +---------------------+
+    | Policy Gradient     |
+    | using Q_i^{omega_i} |
+    +---------------------+
+              |
+              v
+    +---------------------+
+    | Update theta_i      |
+    +---------------------+
+\end{verbatim}
+
+\section{Checklist for Implementation}
+
+\begin{enumerate}[label=\fbox{\arabic*}]
+    \item Define network architectures for each agent:
+    \begin{itemize}
+        \item Critic: input $(s_{\cN_i^{\kappa_o^i}}, a_{\cN_i^{\kappa_o^i}})$, output scalar
+        \item Actor: input $s_i$, output action distribution
+        \item Target critic: copy of critic
+    \end{itemize}
+    
+    \item Implement neighbor information collection:
+    \begin{itemize}
+        \item $\kappa_o^i$-hop neighbors for state-action observation
+        \item $\kappa_r^i$-hop neighbors for reward aggregation
+    \end{itemize}
+    
+    \item Implement TD error computation (Equation~\ref{eq:td_error})
+    
+    \item Implement critic gradient update (Equation 11')
+    
+    \item Implement target network soft update (Equation 14')
+    
+    \item Implement policy gradient estimation (Equation 12')
+    
+    \item Implement actor update with learning rate schedule
+    
+    \item Add stability techniques:
+    \begin{itemize}
+        \item Gradient clipping
+        \item Target network
+        \item Learning rate decay
+    \end{itemize}
+    
+    \item Verify asymmetric information structure is preserved:
+    \begin{itemize}
+        \item Each agent only accesses its designated neighborhood
+        \item No Q-value exchange between agents
+        \item Actor depends only on local state
+    \end{itemize}
+\end{enumerate}
+
+% ============================================================================
+% REFERENCES
+% ============================================================================
+\section*{References}
+
+This manual is based on the paper: ``Distributed and Scalable Algorithm for Networked Multi-agent Reinforcement Learning under Asymmetric Information.''
+
+Key references for neural network actor-critic methods:
+\begin{enumerate}
+    \item Sutton, R.S., et al. (2000). Policy gradient methods for reinforcement learning with function approximation.
+    \item Mnih, V., et al. (2016). Asynchronous methods for deep reinforcement learning (A3C).
+    \item Lillicrap, T.P., et al. (2016). Continuous control with deep reinforcement learning (DDPG).
+    \item Schulman, J., et al. (2017). Proximal policy optimization algorithms (PPO).
+\end{enumerate}
+
+\end{document}

@@ -1,0 +1,30 @@
+============================================================================
+DMARL Ablation Study - Run Summary
+============================================================================
+Running ID: run_20251230_034010
+Timestamp: 20251230_034010
+Results Directory: /home/dongmingwang/project/DMARL_COMM/DMARL_neural/results/run_20251230_034010
+
+Experiment Parameters:
+  - Grid Size: 5 x 5
+  - Max Episodes: 50
+  - Deadline Horizon (ddl): 2
+
+Ablation 1: Varying Observation Neighbors (κ_o)
+  - Fixed κ_r = 1
+  - Varied κ_o: 1, 2, 3
+
+Ablation 2: Varying Reward Neighbors (κ_r)
+  - Fixed κ_o = 2
+  - Varied κ_r: 1, 2
+
+Saved Files:
+  - Individual training curves: ablation1_obs_neighbors/*/training_curves.png
+  - Comparison plots:
+    * ablation1_obs_neighbors_comparison.png
+    * ablation2_reward_neighbors_comparison.png
+  - Training results (JSON): */training_results.json
+  - Training logs: */training.log
+  - Model checkpoints: */checkpoints/
+
+============================================================================
