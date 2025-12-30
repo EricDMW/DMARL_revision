@@ -274,6 +274,34 @@ class VDNAgent:
         with torch.no_grad():
             return self.q_target(local_obs, action_onehot)
     
+    def get_max_target_q_value(
+        self,
+        local_obs: torch.Tensor
+    ) -> torch.Tensor:
+        """
+        Get maximum target Q-value over all actions
+        
+        Args:
+            local_obs: Local observation [batch, local_obs_dim]
+            
+        Returns:
+            max_q_value: Maximum Q-value [batch, 1]
+        """
+        batch_size = local_obs.size(0)
+        max_q = None
+        
+        with torch.no_grad():
+            for action in range(self.n_actions):
+                action_onehot = torch.zeros(batch_size, self.n_actions).to(self.device)
+                action_onehot[:, action] = 1.0
+                q_val = self.q_target(local_obs, action_onehot)
+                if max_q is None:
+                    max_q = q_val
+                else:
+                    max_q = torch.max(max_q, q_val)
+        
+        return max_q
+    
     def soft_update(self) -> None:
         """
         Soft update of target networks

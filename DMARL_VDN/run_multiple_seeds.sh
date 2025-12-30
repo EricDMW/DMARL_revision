@@ -33,7 +33,7 @@ N_REWARD_NEIGHBORS=1
 
 # Seeds to run (adjust as needed)
 # Default: 10 seeds for statistical significance
-SEEDS=(42 123 456 789 1000 2000 3000 4000 5000 6000)
+SEEDS=(42 123 456 789)
 
 # You can customize seeds by modifying the array above
 # Example for 5 seeds: SEEDS=(42 123 456 789 1000)

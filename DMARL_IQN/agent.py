@@ -143,15 +143,15 @@ class IQNAgent:
         actions: torch.Tensor,
         rewards: torch.Tensor,
         next_local_obs: torch.Tensor,
-        next_actions: torch.Tensor,
         dones: torch.Tensor
     ) -> float:
         """
         Update individual Q-network using independent Q-learning
         
         In IQN, each agent updates its Q-network completely independently:
-            L_i = (Q_i(s_i, a_i) - (r_i + γ * Q_i_target(s'_i, a'_i)))^2
+            L_i = (Q_i(s_i, a_i) - (r_i + γ * max_{a'_i} Q_i_target(s'_i, a'_i)))^2
         
+        Uses max Q-value over actions (standard Q-learning), not target policy action.
         No joint value computation - fully decentralized learning.
         
         Args:
@@ -159,24 +159,33 @@ class IQNAgent:
             actions: Actions taken [batch]
             rewards: Individual rewards [batch] (for this agent)
             next_local_obs: Next local observations [batch, local_obs_dim]
-            next_actions: Next actions [batch]
             dones: Done flags [batch]
             
         Returns:
             q_loss: Scalar loss value
         """
-        # One-hot encode actions
+        # One-hot encode current actions
         actions_onehot = F.one_hot(actions, num_classes=self.n_actions).float()
-        next_actions_onehot = F.one_hot(next_actions, num_classes=self.n_actions).float()
         
         # Current Q-value for this agent
         current_q = self.q_network(local_obs, actions_onehot)
         
-        # Target Q-value for this agent (from next state)
+        # Target Q-value: use max Q-value over all actions (standard Q-learning)
         with torch.no_grad():
-            next_q = self.q_target(next_local_obs, next_actions_onehot)
-            # Individual target: reward + gamma * next_q (if not done)
-            target_q = rewards.unsqueeze(1) + self.config.gamma * (1 - dones.unsqueeze(1)) * next_q
+            # Compute Q-values for all possible next actions
+            batch_size = next_local_obs.size(0)
+            next_q_values = []
+            for action in range(self.n_actions):
+                action_onehot = torch.zeros(batch_size, self.n_actions, device=next_local_obs.device)
+                action_onehot[:, action] = 1.0
+                q_val = self.q_target(next_local_obs, action_onehot)
+                next_q_values.append(q_val)
+            
+            # Take max over actions: max_{a'} Q_target(s', a')
+            next_q_max = torch.cat(next_q_values, dim=1).max(dim=1, keepdim=True)[0]
+            
+            # Individual target: reward + gamma * max Q (if not done)
+            target_q = rewards.unsqueeze(1) + self.config.gamma * (1 - dones.unsqueeze(1)) * next_q_max
         
         # Q-network loss (MSE)
         q_loss = F.mse_loss(current_q, target_q)

@@ -12,7 +12,7 @@ This module defines:
 Key design principles:
 - Actor uses only local observation (decentralized execution)
 - Each agent has its own Q-network that takes only its own observation and action
-- Joint Q-value is computed as sum: Q_tot = Σ_i Q_i(s_i, a_i)
+- No joint Q-value computation - each agent learns completely independently
 - Layer normalization for training stability
 - Orthogonal weight initialization
 """

@@ -178,29 +178,22 @@ class IQNSystem:
         q_losses = []
         actor_losses = []
         
-        # Get next actions from target policies
-        next_actions = []
-        for agent_id, agent in enumerate(self.agents):
-            next_action = agent.get_target_action(next_local_obs[:, agent_id, :])
-            next_actions.append(next_action)
-        next_actions = torch.stack(next_actions, dim=1)  # [batch, n_agents]
-        
         # Update each agent independently
+        # In IQN, each agent uses max Q-value over actions (not target policy action)
         for agent_id, agent in enumerate(self.agents):
             agent_local_obs = local_obs[:, agent_id, :]
             agent_action = actions[:, agent_id]
             agent_reward = rewards[:, agent_id]
             agent_next_local_obs = next_local_obs[:, agent_id, :]
-            agent_next_action = next_actions[:, agent_id]
             agent_done = dones[:, agent_id]
             
-            # Update Q-network independently
+            # Update Q-network independently using max Q-value
+            # IQN uses: Q_target = r + γ * max_{a'} Q_target(s', a')
             q_loss = agent.update_q_network(
                 local_obs=agent_local_obs,
                 actions=agent_action,
                 rewards=agent_reward,
                 next_local_obs=agent_next_local_obs,
-                next_actions=agent_next_action,
                 dones=agent_done
             )
             q_losses.append(q_loss)

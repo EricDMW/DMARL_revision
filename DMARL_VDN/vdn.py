@@ -155,9 +155,9 @@ class VDNSystem:
         
         In VDN:
         1. Compute joint Q-value: Q_tot = Σ_i Q_i(s_i, a_i)
-        2. Compute joint target: Q_tot_target = Σ_i r_i + γ * Q_i_target(s'_i, a'_i)
+        2. Compute joint target: Q_tot_target = Σ_i (r_i + γ * max_{a'_i} Q_i_target(s'_i, a'_i))
         3. Loss: L = (Q_tot - Q_tot_target)^2
-        4. Gradients flow to individual Q-networks
+        4. Gradients flow to individual Q-networks through backpropagation
         
         Returns:
             (q_losses, actor_losses): Lists of losses for each agent,
@@ -170,43 +170,74 @@ class VDNSystem:
         (obs, actions, rewards, next_obs, dones,
          local_obs, next_local_obs) = self.replay_buffer.sample(self.config.batch_size)
         
-        q_losses = []
-        actor_losses = []
+        batch_size = local_obs.size(0)
         
-        # Get next actions from target policies
-        next_actions = []
-        for agent_id, agent in enumerate(self.agents):
-            next_action = agent.get_target_action(next_local_obs[:, agent_id, :])
-            next_actions.append(next_action)
-        next_actions = torch.stack(next_actions, dim=1)  # [batch, n_agents]
-        
-        # Update each agent
+        # ============================================
+        # Step 1: Compute joint Q-value Q_tot
+        # ============================================
+        # Q_tot = Σ_i Q_i(s_i, a_i)
+        individual_q_values = []
         for agent_id, agent in enumerate(self.agents):
             agent_local_obs = local_obs[:, agent_id, :]
             agent_action = actions[:, agent_id]
-            agent_reward = rewards[:, agent_id]
+            q_val = agent.get_q_value(agent_local_obs, agent_action)
+            individual_q_values.append(q_val)
+        
+        # Sum individual Q-values to get joint Q-value
+        q_tot = torch.stack(individual_q_values, dim=1).sum(dim=1)  # [batch]
+        
+        # ============================================
+        # Step 2: Compute joint target Q_tot_target
+        # ============================================
+        # Q_tot_target = Σ_i (r_i + γ * max_{a'_i} Q_i_target(s'_i, a'_i))
+        # In VDN, we use the total reward (sum of all agent rewards)
+        total_rewards = rewards.sum(dim=1)  # [batch] - sum of all agent rewards
+        
+        individual_next_q_max = []
+        for agent_id, agent in enumerate(self.agents):
             agent_next_local_obs = next_local_obs[:, agent_id, :]
-            agent_next_action = next_actions[:, agent_id]
             agent_done = dones[:, agent_id]
             
-            # Update Q-network
-            # In VDN, each agent's Q-network is updated independently
-            # but we can also use the joint Q-value for more stable learning
-            q_loss = agent.update_q_network(
-                local_obs=agent_local_obs,
-                actions=agent_action,
-                rewards=agent_reward,
-                next_local_obs=agent_next_local_obs,
-                next_actions=agent_next_action,
-                dones=agent_done,
-                joint_target_q=None  # Not used in individual update
-            )
-            q_losses.append(q_loss)
-            
-            # Update actor
-            actor_loss = agent.update_actor(
-                local_obs=agent_local_obs
-            )
+            # Compute max Q-value over all actions for next state
+            next_q_max = agent.get_max_target_q_value(agent_next_local_obs)
+            # Apply discount and done mask
+            next_q_max_masked = (1 - agent_done.float()).unsqueeze(1) * next_q_max
+            individual_next_q_max.append(next_q_max_masked)
+        
+        # Sum individual max Q-values
+        sum_next_q_max = torch.stack(individual_next_q_max, dim=1).sum(dim=1).squeeze()  # [batch]
+        
+        # Joint target: total_reward + γ * sum of max Q-values
+        q_tot_target = total_rewards + self.config.gamma * sum_next_q_max
+        
+        # ============================================
+        # Step 3: Compute joint loss and backpropagate
+        # ============================================
+        # Loss: L = (Q_tot - Q_tot_target)^2
+        q_loss = F.mse_loss(q_tot, q_tot_target)
+        
+        # Backpropagate - gradients will flow to each individual Q-network
+        # Zero gradients for all agents
+        for agent in self.agents:
+            agent.q_optimizer.zero_grad()
+        
+        # Backward pass - gradients flow through the sum operation to each Q_i
+        q_loss.backward()
+        
+        # Update each Q-network
+        q_losses = []
+        for agent in self.agents:
+            torch.nn.utils.clip_grad_norm_(agent.q_network.parameters(), self.config.grad_clip)
+            agent.q_optimizer.step()
+            q_losses.append(q_loss.item())  # Same loss for all agents (joint loss)
+        
+        # ============================================
+        # Step 4: Update actors independently
+        # ============================================
+        actor_losses = []
+        for agent_id, agent in enumerate(self.agents):
+            agent_local_obs = local_obs[:, agent_id, :]
+            actor_loss = agent.update_actor(agent_local_obs)
             actor_losses.append(actor_loss)
             
             # Soft update target networks

@@ -6,7 +6,7 @@ This directory contains an implementation of SAC (Soft Actor-Critic) for multi-a
 
 SAC is an off-policy actor-critic algorithm that uses entropy regularization for exploration:
 
-**Soft Q-Learning**: Q(s,a) = r + γ * (Q(s',a') - α * log π(a'|s'))
+**Soft Q-Learning**: Q(s,a) = r + γ * E[Q(s',a') - α * log π(a'|s')]
 
 **Actor Update**: Maximize E[Q(s,a) - α * log π(a|s)]
 

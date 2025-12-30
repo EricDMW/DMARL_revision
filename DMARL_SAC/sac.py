@@ -159,9 +159,11 @@ class SACSystem:
         Update all agents using SAC algorithm
         
         In SAC:
-        1. Soft Q-learning: Q(s,a) = r + γ * (Q(s',a') - α * log π(a'|s'))
+        1. Soft Q-learning: Q(s,a) = r + γ * E[Q(s',a') - α * log π(a'|s')]
+           where expectation is over a' ~ π(·|s')
         2. Actor update: maximize E[Q(s,a) - α * log π(a|s)]
-        3. Uses two Q-networks (Q1, Q2) and takes minimum for target
+           where expectation is over a ~ π(·|s)
+        3. Uses two Q-networks (Q1, Q2) and takes minimum for target stability
         
         Returns:
             (q_losses, actor_losses): Lists of losses for each agent,

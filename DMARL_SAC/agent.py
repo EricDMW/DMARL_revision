@@ -191,8 +191,9 @@ class SACAgent:
         Update Q-networks using soft Q-learning
         
         Soft Q-learning update:
-            Q(s,a) = r + γ * (min(Q1(s',a'), Q2(s',a')) - α * log π(a'|s'))
+            Q(s,a) = r + γ * E[min(Q1(s',a'), Q2(s',a')) - α * log π(a'|s')]
         
+        where expectation E[·] is over a' ~ π(·|s').
         Uses two Q-networks and takes minimum for stability.
         
         Args:
